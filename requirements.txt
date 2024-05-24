@@ -1,0 +1,11 @@
+pandas
+scikit-learn
+numpy
+scipy
+ipykernel
+supabase
+python-dotenv
+numpy
+
+
+

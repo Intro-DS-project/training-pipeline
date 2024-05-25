@@ -1,13 +1,13 @@
 from fastapi import FastAPI, Query, HTTPException
 from pydantic import BaseModel
-import mlflow
 import pandas as pd
 import json
 import pickle
 
 app = FastAPI()
 
-path = 'plugins/model/model_2024-05-25.pkl'
+path = 'model/model.pkl'
+
 
 class InputData(BaseModel):
     area: int

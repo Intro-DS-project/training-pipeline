@@ -9,7 +9,6 @@ import logging
 import numpy as np
 import pickle
 import random 
-import mlflow
 from time import strftime
 import os
 
@@ -30,7 +29,8 @@ from sklearn.ensemble import RandomForestRegressor
 
 url = "https://jbmadihsplmgajpaxywf.supabase.co"
 key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpibWFkaWhzcGxtZ2FqcGF4eXdmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTQxOTMxNjUsImV4cCI6MjAyOTc2OTE2NX0.QgyfO_jrqNfY7_ZOm6KnEb4BrmUsj-wumP3DuqrieOM"
-
+rmse_file_path = 'model/rmse.txt'
+model_file_path = 'model/model.pkl'
 def init():
     supabase = create_client(url, key)
     return supabase
@@ -45,6 +45,17 @@ def save_object(file_path, obj):
       except Exception as e:
          print(e)
 
+def read_metrics(file_path):
+    if os.path.exists(file_path):
+        with open(file_path, 'r') as file:
+            metric = float(file.read())
+    else:
+        metric = float('inf') 
+    return metric
+
+def write_metrics(file_path, metric):
+    with open(file_path, 'w') as file:
+        file.write(str(metric))
 
 
 with open('/opt/airflow/dags/location.json', 'r', encoding='utf-8') as file:
@@ -107,13 +118,6 @@ default_args = {
 
 @dag(default_args=default_args, schedule='@daily', catchup=False, dag_id='predict_price_house')
 def predict_price_house():
-    # @task 
-    # def start():
-    #      SUPABASE_URL= "https://jbmadihsplmgajpaxywf.supabase.co"
-    #      SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpibWFkaWhzcGxtZ2FqcGF4eXdmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTQxOTMxNjUsImV4cCI6MjAyOTc2OTE2NX0.QgyfO_jrqNfY7_ZOm6KnEb4BrmUsj-wumP3DuqrieOM"
-    #      supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-    #      return supabase
-    
     @task()
     def fetch_data():
             supabase = init()
@@ -125,10 +129,6 @@ def predict_price_house():
             df_rongbay = pd.DataFrame(response.data)
             df_concatenated  = pd.concat([df_mogi, df_muaban, df_rongbay], ignore_index=True)
             df_concatenated['id'] = range(1, len(df_concatenated) + 1)
-            # log to check the data
-            # logging.info(f'First few rows of concatenated DataFrame:\n{df_concatenated.head()}')
-            # logging.info('jjjjjjjjjjjjjjjjjjjjjjjjjjjjj')
-            #r return df_concatenated   # but not return data frame
             df_json = df_concatenated.to_json(orient='split')        
             return df_json
 
@@ -171,14 +171,10 @@ def predict_price_house():
         # remove outliers
         df['price_zscore'] = stats.zscore(df['price'])
         df['area_zscore'] = stats.zscore(df['area'])
-        logging.info('sao no lai khong chay')
         price_outlier = df[(df['price_zscore'].abs() > 0.3)]
         area_outlier = df[(df['area_zscore'].abs() > 1.36)]
-        logging.info('sao no lai khong chay- ---------')
         outlier_zscore = pd.concat([price_outlier, area_outlier]).drop_duplicates()
         df = df.drop(outlier_zscore.index)      
-        logging.info('chay roi thi tra ve di ---------') 
-        logging.info(f'First few rows of processed DataFrame:\n{df.head()}')
         categorical_cols  = ['street', 'ward', 'district', 'direction']
         for col in categorical_cols:
                 df[col] = df[col].astype('str')
@@ -190,7 +186,6 @@ def predict_price_house():
     @task()
     def train_model(df_json):
         df = pd.read_json(df_json, orient='split')
-        # drop unnecessary columns
         df = df.drop(columns=['id', 'created_at', 'post_date', 'current_floor', 'num_floor', 'direction', 'street_width', 'price_zscore', 'area_zscore'])
         categorical_cols = ['street', 'ward', 'district']
         numerical_cols = df.drop(columns=['price'] + categorical_cols).columns.tolist()
@@ -225,22 +220,25 @@ def predict_price_house():
             clf.fit(X_train, y_train)
             y_pred = clf.predict(X_test)            
             rmse = np.sqrt(mean_squared_error(y_test, y_pred))
-            time = strftime("%Y-%m-%d")
-            with open(f'plugins/model/model_{time}.pkl','wb') as file:
-                pickle.dump(clf, file)
-            with open(f'plugins/model/rmse.txt','w') as file:
-                file.write(str(rmse))
-            return float(rmse)
+            if os.path.exists(rmse_file_path):
+                with open(rmse_file_path, 'r') as file:
+                    pre_rmse = float(file.read())
+            else:
+                pre_rmse = float('inf')
 
-    @task()
-    def eval_model(rmse:float):
-        print(rmse)
+            print(f"Model: {model_name}, RMSE: {rmse}, Pre RMSE: {pre_rmse}")
+            if rmse < pre_rmse:
+                    print(f"New model {model_name} saved with RMSE: {rmse}")
+                    with open('/opt/airflow/model/model.pkl', 'wb') as model_file:
+                        pickle.dump(clf, model_file)
+                    with open('/opt/airflow/model/rmse.txt', 'w') as file:
+                        file.write(str(rmse))
+            else:
+                print("Model not saved")     
 
-    
     data = fetch_data()
     processed_data = process_data(data)
-    train_model_task = train_model(processed_data)
-    eval_model(train_model_task)
+    train_model(processed_data)
 
     # Set task dependencies
     # data >> processed_data >> train_model_task >> eval_model_task   

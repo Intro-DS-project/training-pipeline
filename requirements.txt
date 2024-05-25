@@ -6,6 +6,7 @@ ipykernel
 supabase
 python-dotenv
 numpy
+mlflow
 
 
 

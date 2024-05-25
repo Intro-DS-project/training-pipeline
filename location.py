@@ -2279,11 +2279,13 @@ def remove_keywords(useless_keywords: list, street: str) -> str:
 
 # print(get_all_districts())
 
-
+import random
 def get_street_by_ward(location, ward):
     for district in location["district"]:
         if ward in district["wards"]:
             index = len(district['streets'])
-            return district["streets"][randint(0, index-1)]
+            return district["streets"][random.randint(0, index-1)]
 
-print(get_street_by_ward(location, "Khương Đình"))
+random_district = random.choice(location["district"])
+print(random.choice(random_district['wards']))
+

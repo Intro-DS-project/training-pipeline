@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/trunq/Hust/20232/Data-Science/price-house-predict/mlruns/0/247ce27ff3ea4d619c4122354155f93c/artifacts
+end_time: null
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: 247ce27ff3ea4d619c4122354155f93c
+run_name: crawling-snail-666
+run_uuid: 247ce27ff3ea4d619c4122354155f93c
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1716574039820
+status: 1
+tags: []
+user_id: trunq

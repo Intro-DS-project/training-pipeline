@@ -162,3 +162,5 @@ cython_debug/
 /dags/__pycache__
 /data
 remote_db.ipynb
+/img
+
